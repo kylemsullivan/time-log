@@ -25,6 +25,11 @@ export function useSpanHistory(initialSpans) {
     });
   }, []);
 
+  // Layers saved days over whatever is in memory (defaults for the visible week).
+  const restoreSpans = useCallback((saved) => {
+    if (saved && Object.keys(saved).length) setSpansByDate((current) => ({ ...current, ...saved }));
+  }, []);
+
   const applyAction = useCallback((action, forward) => {
     setSpansByDate((current) => ({ ...current, [action.date]: applyToRows(current[action.date] || EMPTY_ROWS, action, forward) }));
   }, []);
@@ -110,6 +115,6 @@ export function useSpanHistory(initialSpans) {
 
   return {
     spansByDate, changeLog, canUndo: undoStack.length > 0, canRedo: redoStack.length > 0,
-    ensureDates, updateSpan, addSpan, removeSpan, undo, redo, undoEntry, redoEntry, removeChange,
+    ensureDates, restoreSpans, updateSpan, addSpan, removeSpan, undo, redo, undoEntry, redoEntry, removeChange,
   };
 }

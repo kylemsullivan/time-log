@@ -22,9 +22,46 @@ The app is a single-user local desktop tool. The draft includes imported note co
 
 Folder selection happens in Electron's main process. The selected folder path is stored in Electron's local user data, and note contents are read from that directory through the preload bridge.
 
+## Data storage
+
+Worked spans are saved automatically to a single JSON file in Electron's user data directory (on macOS, `~/Library/Application Support/Time Log/spans.json`), next to `notes-directory.json`. Nothing leaves your machine, and your Obsidian notes are never written to.
+
+```json
+{
+  "version": 1,
+  "days": {
+    "2026-10-19": [{ "id": "1729350000000-ab12cd", "start": "09:00", "end": "12:00" }]
+  }
+}
+```
+
+- **Only edited days are saved.** Days still showing the placeholder `08:00-18:00` weekday default are omitted, so reloading never mistakes a placeholder for real data.
+- **When it saves.** About 300 ms after your last edit, and again when the window hides or closes. Saving is disabled until the file has loaded successfully, so a failed read can't overwrite existing data.
+- **Safe writes.** Each save writes `spans.json.tmp` and renames it over `spans.json`, and saves are queued so they can't interleave.
+- **Corrupt or unsupported files** are moved aside to `spans.json.corrupt-<timestamp>` and the app starts empty. Individual malformed days or spans are dropped on load.
+- **Undo/redo history is not saved.** It resets on each launch.
+- **Backups and sync.** The file is plain JSON, so you can copy it, diff it, or edit it by hand while the app is closed.
+- **Use a different location.** Set `TIME_LOG_USER_DATA` to a directory before launching to keep all local data (spans and notes folder) there. The e2e tests use this to stay isolated from your real data. `TIME_LOG_USE_DIST=1` makes an unpackaged Electron load the built `dist/` instead of the Vite dev server.
+
+## Testing
+
+```sh
+npm test              # unit + integration (Vitest)
+npm run test:unit     # src/lib and electron/spans-store only
+npm run test:e2e      # builds the renderer and drives the real Electron app (Playwright)
+npm run test:all
+```
+
+- **Unit** (`tests/unit`) — pure logic: time parsing, dates, span rules and undo/redo transitions, grouping, change detection, and the spans file store (against a temp directory).
+- **Integration** (`tests/integration`) — React hooks and the full `App` in jsdom with a fake `window.timeLog` bridge, plus the IPC handlers in `electron/main.cjs` against a mocked Electron.
+- **E2E** (`tests/e2e`) — launches Electron with a throwaway `TIME_LOG_USER_DATA`, edits hours, restarts the app, and checks the data came back.
+
 ## Structure
 
 - `electron/main.cjs` — Electron window and secure file-picker IPC
+- `electron/spans-store.cjs` — atomic JSON persistence for worked spans
 - `electron/preload.cjs` — context-isolated renderer API
 - `src/ui` — React interface
 - `src/lib/time-log.js` — time parsing and draft formatting
+- `src/lib/persistence.js` — decides which days are worth saving
+- `src/ui/hooks/useSpanStorage.js` — load on mount, debounced save

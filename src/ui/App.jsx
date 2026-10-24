@@ -6,6 +6,7 @@ import { defaultRows, EMPTY_ROWS, spanMinutes, totalFor } from '../lib/spans.js'
 import { groupDatesByYear } from '../lib/grouping.js';
 import { useSpanHistory } from './hooks/useSpanHistory.js';
 import { useHistoryShortcuts } from './hooks/useHistoryShortcuts.js';
+import { useSpanStorage } from './hooks/useSpanStorage.js';
 import { useNotes } from './hooks/useNotes.js';
 import Sidebar from './components/Sidebar.jsx';
 import DayRow from './components/DayRow.jsx';
@@ -18,7 +19,8 @@ const initialSpans = () => Object.fromEntries(weekDates(initialMonday).map((date
 export default function App() {
   const [weekStart, setWeekStart] = useState(initialMonday);
   const history = useSpanHistory(initialSpans);
-  const { spansByDate, ensureDates, undo, redo } = history;
+  const { spansByDate, ensureDates, restoreSpans, undo, redo } = history;
+  const { storageError } = useSpanStorage(spansByDate, restoreSpans);
   const { notes, noteDates, notesDirectory, directoryError, chooseNotesDirectory } = useNotes(weekStart);
   const datePickerRef = useRef(null);
   const dates = useMemo(() => weekDates(weekStart), [weekStart]);
@@ -50,7 +52,7 @@ export default function App() {
     <main className="main-content">
       <div className="content-wrap">
         <div className="page-heading"><div><div className="eyebrow">WEEKLY TIMESHEET</div><h1>Time Log</h1></div><button type="button" title={notesDirectory ?? 'Choose Obsidian Notes Folder'} className={`button secondary directory-button ${notesDirectory ? 'is-set' : ''}`} onClick={chooseNotesDirectory}><FolderOpen size={16} /><span>Change</span></button></div>
-        {directoryError && <div className="directory-error" role="alert">{directoryError}</div>}
+        {(directoryError || storageError) && <div className="directory-error" role="alert">{directoryError || storageError}</div>}
         <div className="week-strip">
           <button className="week-arrow" title={previousWeek} aria-label={previousWeek} onClick={() => selectWeek(shiftDate(weekStart, -7))}><ChevronLeft size={17} /></button>
           <button type="button" className="picker-label" title="Choose Week" onClick={openDatePicker}><CalendarDays size={17} /><span>Week of</span></button>

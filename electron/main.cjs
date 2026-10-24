@@ -1,10 +1,14 @@
 const { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs/promises');
+const { createSpansStore } = require('./spans-store.cjs');
 
-const isDev = !app.isPackaged;
+// TIME_LOG_USE_DIST=1 loads the built renderer from dist/ instead of the Vite dev server (used by e2e tests).
+const isDev = !app.isPackaged && !process.env.TIME_LOG_USE_DIST;
 const appIcon = path.join(__dirname, '../build/icon.png');
 app.setName('Time Log');
+// Lets tests (and portable setups) keep all local data in a throwaway directory.
+if (process.env.TIME_LOG_USER_DATA) app.setPath('userData', process.env.TIME_LOG_USER_DATA);
 
 function createWindow() {
   const window = new BrowserWindow({
@@ -86,6 +90,12 @@ ipcMain.handle('notes:get-directory', async () => {
     return null;
   }
 });
+
+let spansStore;
+const getSpansStore = () => (spansStore ??= createSpansStore(path.join(app.getPath('userData'), 'spans.json')));
+
+ipcMain.handle('spans:load', () => getSpansStore().load());
+ipcMain.handle('spans:save', (_event, days) => getSpansStore().save(days));
 
 app.whenReady().then(() => {
   if (isDev && process.platform === 'darwin' && app.dock) app.dock.setIcon(nativeImage.createFromPath(appIcon));

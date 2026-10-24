@@ -4,3 +4,5 @@ release/
 .DS_Store
 .npm-cache/
 *.log
+test-results/
+playwright-report/

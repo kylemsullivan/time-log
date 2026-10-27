@@ -9,7 +9,13 @@ npm install
 npm run dev
 ```
 
-`npm run build` builds the React renderer. Packaging and signing are intentionally left for a later step.
+`npm run build` builds the React renderer. To rebuild the macOS desktop app and create a fresh ZIP installer, run:
+
+```sh
+npm run rebuild
+```
+
+The script runs the renderer build and then packages Electron for macOS as a ZIP. The artifact is written to `release/Time Log-<version>-<architecture>-mac.zip` (for example, `release/Time Log-0.1.0-arm64-mac.zip`). `npm run package:mac` remains available as an alias. Packaging requires the project dependencies to be installed with `npm install` first.
 
 ## Current workflow
 

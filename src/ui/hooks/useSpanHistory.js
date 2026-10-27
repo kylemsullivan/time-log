@@ -25,6 +25,11 @@ export function useSpanHistory(initialSpans) {
     });
   }, []);
 
+  // Layers saved days over whatever is in memory (defaults for the visible week).
+  const restoreSpans = useCallback((saved) => {
+    if (saved && Object.keys(saved).length) setSpansByDate((current) => ({ ...current, ...saved }));
+  }, []);
+
   const applyAction = useCallback((action, forward) => {
     setSpansByDate((current) => ({ ...current, [action.date]: applyToRows(current[action.date] || EMPTY_ROWS, action, forward) }));
   }, []);
@@ -72,6 +77,20 @@ export function useSpanHistory(initialSpans) {
     }
   }, [recordAction]);
 
+  // Replaces whole days with imported spans, one undoable change per day that actually differs.
+  const importDays = useCallback((days) => {
+    let changed = 0;
+    Object.entries(days).forEach(([date, spans]) => {
+      const previousRows = latest.current.spansByDate[date] || EMPTY_ROWS;
+      const same = previousRows.length === spans.length && previousRows.every((row, index) => row.start === spans[index].start && row.end === spans[index].end);
+      if (same) return;
+      const nextRows = spans.map(({ start, end }) => blankSpan(start, end));
+      recordAction({ kind: 'rows', date, previousRows, nextRows }, `${dayLabel(date)} · imported`);
+      changed += 1;
+    });
+    return changed;
+  }, [recordAction]);
+
   const undoEntry = useCallback((entry) => {
     if (entry.kind !== 'field') applyAction(entry, false);
     const nextLog = latest.current.changeLog.map((item) => (item.id === entry.id ? { ...entry, status: 'undone', undoneAt: Date.now() } : item));
@@ -110,6 +129,6 @@ export function useSpanHistory(initialSpans) {
 
   return {
     spansByDate, changeLog, canUndo: undoStack.length > 0, canRedo: redoStack.length > 0,
-    ensureDates, updateSpan, addSpan, removeSpan, undo, redo, undoEntry, redoEntry, removeChange,
+    ensureDates, restoreSpans, importDays, updateSpan, addSpan, removeSpan, undo, redo, undoEntry, redoEntry, removeChange,
   };
 }

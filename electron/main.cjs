@@ -1,10 +1,14 @@
 const { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs/promises');
+const { createSpansStore } = require('./spans-store.cjs');
 
-const isDev = !app.isPackaged;
+// TIME_LOG_USE_DIST=1 loads the built renderer from dist/ instead of the Vite dev server (used by e2e tests).
+const isDev = !app.isPackaged && !process.env.TIME_LOG_USE_DIST;
 const appIcon = path.join(__dirname, '../build/icon.png');
 app.setName('Time Log');
+// Lets tests (and portable setups) keep all local data in a throwaway directory.
+if (process.env.TIME_LOG_USER_DATA) app.setPath('userData', process.env.TIME_LOG_USER_DATA);
 
 function createWindow() {
   const window = new BrowserWindow({
@@ -86,6 +90,39 @@ ipcMain.handle('notes:get-directory', async () => {
     return null;
   }
 });
+
+const MAX_IMPORT_BYTES = 5 * 1024 * 1024;
+const dialogOwner = (event) => BrowserWindow.fromWebContents(event.sender);
+const showDialog = (owner, method, options) => (owner ? dialog[method](owner, options) : dialog[method](options));
+
+ipcMain.handle('files:export', async (event, { defaultName, extension, content }) => {
+  const result = await showDialog(dialogOwner(event), 'showSaveDialog', {
+    title: 'Export time log',
+    defaultPath: defaultName,
+    filters: [{ name: extension.toUpperCase(), extensions: [extension] }],
+  });
+  if (result.canceled || !result.filePath) return null;
+  await fs.writeFile(result.filePath, content, 'utf8');
+  return { path: result.filePath };
+});
+
+ipcMain.handle('files:import', async (event) => {
+  const result = await showDialog(dialogOwner(event), 'showOpenDialog', {
+    title: 'Import time log',
+    properties: ['openFile'],
+    filters: [{ name: 'Time log files', extensions: ['csv', 'md', 'markdown', 'txt', 'json'] }],
+  });
+  if (result.canceled || !result.filePaths[0]) return null;
+  const filePath = result.filePaths[0];
+  if ((await fs.stat(filePath)).size > MAX_IMPORT_BYTES) throw new Error('That file is too large to import (5 MB limit).');
+  return { name: path.basename(filePath), content: await fs.readFile(filePath, 'utf8') };
+});
+
+let spansStore;
+const getSpansStore = () => (spansStore ??= createSpansStore(path.join(app.getPath('userData'), 'spans.json')));
+
+ipcMain.handle('spans:load', () => getSpansStore().load());
+ipcMain.handle('spans:save', (_event, days) => getSpansStore().save(days));
 
 app.whenReady().then(() => {
   if (isDev && process.platform === 'darwin' && app.dock) app.dock.setIcon(nativeImage.createFromPath(appIcon));

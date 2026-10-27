@@ -52,6 +52,8 @@ export function applyToRows(current, action, forward) {
       if (index >= 0) rows[index] = forward ? action.nextSpan : action.previousSpan;
       return rows;
     }
+    case 'rows':
+      return [...(forward ? action.nextRows : action.previousRows)];
     default:
       return rows;
   }

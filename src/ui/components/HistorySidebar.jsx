@@ -1,5 +1,5 @@
 import { memo, useEffect, useState } from 'react';
-import { Redo2, Trash2, Undo2 } from 'lucide-react';
+import { PanelRightClose, PanelRightOpen, Redo2, Trash2, Undo2 } from 'lucide-react';
 
 const DELETE_DELAY_MS = 1000;
 const canDelete = (entry) => entry.status === 'undone' && Date.now() - entry.undoneAt >= DELETE_DELAY_MS;
@@ -19,7 +19,7 @@ function HistoryItem({ entry, onUndo, onRedo, onRemove }) {
   </div>;
 }
 
-function HistorySidebar({ changeLog, canUndo, canRedo, onUndo, onRedo, onUndoEntry, onRedoEntry, onRemove }) {
+function HistorySidebar({ changeLog, collapsed, onToggle, canUndo, canRedo, onUndo, onRedo, onUndoEntry, onRedoEntry, onRemove }) {
   const [, setTick] = useState(0);
 
   // Re-render once the newest undone entry becomes deletable.
@@ -31,10 +31,16 @@ function HistorySidebar({ changeLog, canUndo, canRedo, onUndo, onRedo, onUndoEnt
     return () => clearTimeout(timer);
   }, [changeLog]);
 
+  if (collapsed) return <aside className="history-sidebar collapsed">
+    <button className="history-toggle" title="Show Changes" aria-label="Show Changes" aria-expanded="false" onClick={onToggle}><PanelRightOpen size={16} /></button>
+    <span className="history-count" title={`${changeLog.length} Changes`}>{changeLog.length}</span>
+  </aside>;
+
   return <aside className="history-sidebar">
     <div className="history-heading"><h2>Changes ({changeLog.length})</h2><div className="history-tools">
       <button title="Undo" aria-label="Undo" disabled={!canUndo} onClick={onUndo}><Undo2 size={16} /></button>
       <button title="Redo" aria-label="Redo" disabled={!canRedo} onClick={onRedo}><Redo2 size={16} /></button>
+      <button title="Hide Changes" aria-label="Hide Changes" aria-expanded="true" onClick={onToggle}><PanelRightClose size={16} /></button>
     </div></div>
     <div className="history-list">{changeLog.length
       ? [...changeLog].reverse().map((entry) => <HistoryItem key={entry.id} entry={entry} onUndo={onUndoEntry} onRedo={onRedoEntry} onRemove={onRemove} />)

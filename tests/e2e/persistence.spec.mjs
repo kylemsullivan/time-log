@@ -27,9 +27,12 @@ test('hours survive quitting and relaunching the app', async () => {
   await expect(page.getByLabel('Monday Span 1 End Time')).toHaveValue('18:00');
 
   await page.getByLabel('Monday Span 1 Start Time').fill('09:00');
+  await page.keyboard.press('Enter');
   await page.getByLabel('Monday Span 1 End Time').fill('12:00');
+  await page.keyboard.press('Enter');
   await page.getByRole('button', { name: 'Add Monday Span' }).click();
   await page.getByLabel('Monday Span 2 End Time').fill('17:00');
+  await page.keyboard.press('Enter');
 
   await expect.poll(async () => Object.values((await readSpansOrEmpty()).days)[0]?.[1]?.end).toBe('17:00');
   await app.close();
@@ -59,8 +62,10 @@ test('a fresh install writes nothing until hours are edited', async () => {
 test('removed edits go back to placeholders after relaunch', async () => {
   let { app, page } = await launch();
   await page.getByLabel('Monday Span 1 End Time').fill('12:00');
+  await page.keyboard.press('Enter');
   await expect.poll(async () => Object.keys((await readSpansOrEmpty()).days).length).toBe(1);
-  await page.getByLabel('Monday Span 1 End Time').fill('18:00'); // back to the placeholder value
+  await page.getByLabel('Monday Span 1 End Time').fill('18:00');
+  await page.keyboard.press('Enter'); // back to the placeholder value
   await expect.poll(async () => Object.keys((await readSpans()).days).length).toBe(0);
   await app.close();
 
@@ -74,6 +79,7 @@ test('a corrupt spans file is set aside and the app still starts', async () => {
   const { app, page } = await launch();
   await expect(page.getByLabel('Monday Span 1 End Time')).toHaveValue('18:00');
   await page.getByLabel('Monday Span 1 End Time').fill('12:00');
+  await page.keyboard.press('Enter');
   await expect.poll(async () => (await readSpansOrEmpty()).version).toBe(1);
   const names = await fs.readdir(userData);
   expect(names.some((name) => name.startsWith('spans.json.corrupt-'))).toBe(true);
@@ -86,5 +92,22 @@ test('saved days from other weeks are restored', async () => {
   await page.getByLabel('Choose Week').fill('2025-03-03');
   await expect(page.getByLabel('Monday Span 1 Start Time')).toHaveValue('10:00');
   await expect(page.getByLabel('Monday Span 1 End Time')).toHaveValue('14:30');
+  await app.close();
+});
+
+test('typed shorthand times are saved and the changes panel can collapse', async () => {
+  const { app, page } = await launch();
+  await page.getByLabel('Monday Span 1 Start Time').fill('930');
+  await page.keyboard.press('Tab');
+  await page.getByLabel('Monday Span 1 End Time').fill('5p');
+  await page.keyboard.press('Enter');
+  await expect(page.getByLabel('Monday Span 1 Start Time')).toHaveValue('09:30');
+  await expect(page.getByLabel('Monday Span 1 End Time')).toHaveValue('17:00');
+  await expect.poll(async () => Object.values((await readSpansOrEmpty()).days)[0]?.[0]?.end).toBe('17:00');
+
+  await page.getByRole('button', { name: 'Hide Changes' }).click();
+  await expect(page.getByText(/^Changes \(/)).toHaveCount(0);
+  await page.getByRole('button', { name: 'Show Changes' }).click();
+  await expect(page.getByText('Changes (2)')).toBeVisible();
   await app.close();
 });

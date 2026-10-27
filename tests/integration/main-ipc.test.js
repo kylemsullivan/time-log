@@ -13,12 +13,15 @@ let handlers;
 let originalLoad;
 
 // Loads electron/main.cjs against a stand-in `electron` module and captures its IPC handlers.
-function loadMain({ openDialog } = {}) {
+function loadMain({ openDialog, saveDialog } = {}) {
   handlers = {};
   const electron = {
     app: { setName() {}, setPath(_name, value) { userData = value; }, getPath: () => userData, isPackaged: true, whenReady: () => new Promise(() => {}), on() {} },
     BrowserWindow: Object.assign(function BrowserWindow() {}, { fromWebContents: () => null, getAllWindows: () => [] }),
-    dialog: { showOpenDialog: async () => openDialog ?? { canceled: true, filePaths: [] } },
+    dialog: {
+      showOpenDialog: async () => openDialog ?? { canceled: true, filePaths: [] },
+      showSaveDialog: async () => saveDialog ?? { canceled: true },
+    },
     ipcMain: { handle: (channel, fn) => { handlers[channel] = fn; } },
     Menu: {},
     nativeImage: {},
@@ -76,5 +79,29 @@ describe('notes IPC', () => {
     const week = await handlers['notes:read-week']({}, { directory: vault, startDate: '2026-10-19', endDate: '2026-10-25' });
     expect(week).toEqual([expect.objectContaining({ date: '2026-10-19', content: 'Monday notes' })]);
     expect(await handlers['notes:list-dates']({}, '')).toEqual([]);
+  });
+});
+
+describe('file import/export IPC', () => {
+  it('writes the exported content to the chosen path', async () => {
+    const filePath = path.join(userData, 'out.csv');
+    loadMain({ saveDialog: { canceled: false, filePath } });
+    expect(await handlers['files:export']({ sender: {} }, { defaultName: 'time-log.csv', extension: 'csv', content: 'a,b\n' })).toEqual({ path: filePath });
+    expect(await fs.readFile(filePath, 'utf8')).toBe('a,b\n');
+  });
+
+  it('writes nothing when the save dialog is cancelled', async () => {
+    loadMain();
+    expect(await handlers['files:export']({ sender: {} }, { defaultName: 'x.csv', extension: 'csv', content: 'x' })).toBeNull();
+  });
+
+  it('reads the chosen import file and returns null when cancelled', async () => {
+    const filePath = path.join(userData, 'in.csv');
+    await fs.writeFile(filePath, 'date,start,end\n');
+    loadMain({ openDialog: { canceled: false, filePaths: [filePath] } });
+    expect(await handlers['files:import']({ sender: {} })).toEqual({ name: 'in.csv', content: 'date,start,end\n' });
+    Module._load = originalLoad;
+    loadMain();
+    expect(await handlers['files:import']({ sender: {} })).toBeNull();
   });
 });

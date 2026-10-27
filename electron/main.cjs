@@ -91,6 +91,33 @@ ipcMain.handle('notes:get-directory', async () => {
   }
 });
 
+const MAX_IMPORT_BYTES = 5 * 1024 * 1024;
+const dialogOwner = (event) => BrowserWindow.fromWebContents(event.sender);
+const showDialog = (owner, method, options) => (owner ? dialog[method](owner, options) : dialog[method](options));
+
+ipcMain.handle('files:export', async (event, { defaultName, extension, content }) => {
+  const result = await showDialog(dialogOwner(event), 'showSaveDialog', {
+    title: 'Export time log',
+    defaultPath: defaultName,
+    filters: [{ name: extension.toUpperCase(), extensions: [extension] }],
+  });
+  if (result.canceled || !result.filePath) return null;
+  await fs.writeFile(result.filePath, content, 'utf8');
+  return { path: result.filePath };
+});
+
+ipcMain.handle('files:import', async (event) => {
+  const result = await showDialog(dialogOwner(event), 'showOpenDialog', {
+    title: 'Import time log',
+    properties: ['openFile'],
+    filters: [{ name: 'Time log files', extensions: ['csv', 'md', 'markdown', 'txt', 'json'] }],
+  });
+  if (result.canceled || !result.filePaths[0]) return null;
+  const filePath = result.filePaths[0];
+  if ((await fs.stat(filePath)).size > MAX_IMPORT_BYTES) throw new Error('That file is too large to import (5 MB limit).');
+  return { name: path.basename(filePath), content: await fs.readFile(filePath, 'utf8') };
+});
+
 let spansStore;
 const getSpansStore = () => (spansStore ??= createSpansStore(path.join(app.getPath('userData'), 'spans.json')));
 

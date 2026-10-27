@@ -77,6 +77,20 @@ export function useSpanHistory(initialSpans) {
     }
   }, [recordAction]);
 
+  // Replaces whole days with imported spans, one undoable change per day that actually differs.
+  const importDays = useCallback((days) => {
+    let changed = 0;
+    Object.entries(days).forEach(([date, spans]) => {
+      const previousRows = latest.current.spansByDate[date] || EMPTY_ROWS;
+      const same = previousRows.length === spans.length && previousRows.every((row, index) => row.start === spans[index].start && row.end === spans[index].end);
+      if (same) return;
+      const nextRows = spans.map(({ start, end }) => blankSpan(start, end));
+      recordAction({ kind: 'rows', date, previousRows, nextRows }, `${dayLabel(date)} · imported`);
+      changed += 1;
+    });
+    return changed;
+  }, [recordAction]);
+
   const undoEntry = useCallback((entry) => {
     if (entry.kind !== 'field') applyAction(entry, false);
     const nextLog = latest.current.changeLog.map((item) => (item.id === entry.id ? { ...entry, status: 'undone', undoneAt: Date.now() } : item));
@@ -115,6 +129,6 @@ export function useSpanHistory(initialSpans) {
 
   return {
     spansByDate, changeLog, canUndo: undoStack.length > 0, canRedo: redoStack.length > 0,
-    ensureDates, restoreSpans, updateSpan, addSpan, removeSpan, undo, redo, undoEntry, redoEntry, removeChange,
+    ensureDates, restoreSpans, importDays, updateSpan, addSpan, removeSpan, undo, redo, undoEntry, redoEntry, removeChange,
   };
 }

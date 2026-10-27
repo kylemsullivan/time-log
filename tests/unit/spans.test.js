@@ -78,3 +78,11 @@ describe('sameField', () => {
     expect(sameField(a, { ...a, kind: 'insert' })).toBe(false);
   });
 });
+
+describe('applyToRows rows action', () => {
+  const action = { kind: 'rows', date: '2026-10-19', previousRows: [span('a', '08:00', '18:00')], nextRows: [span('b', '09:00', '12:00'), span('c', '13:00', '17:00')] };
+  it('swaps whole days forward and backward', () => {
+    expect(applyToRows(action.previousRows, action, true)).toEqual(action.nextRows);
+    expect(applyToRows(action.nextRows, action, false)).toEqual(action.previousRows);
+  });
+});

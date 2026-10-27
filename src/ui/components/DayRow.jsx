@@ -3,19 +3,20 @@ import { Plus, Trash2 } from 'lucide-react';
 import { formatDuration } from '../../lib/time-log.js';
 import { shortDate } from '../../lib/dates.js';
 import { spanMinutes, totalFor } from '../../lib/spans.js';
+import TimeInput from './TimeInput.jsx';
 
 export const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
-function DayRow({ date, index, rows, onUpdate, onAdd, onRemove }) {
+function DayRow({ date, index, rows, highlighted, onUpdate, onAdd, onRemove }) {
   const day = DAYS[index];
-  return <div id={`hours-${date}`} className={`week-day-row ${index > 4 ? 'weekend' : ''}`}>
+  return <div id={`hours-${date}`} className={`week-day-row ${index > 4 ? 'weekend' : ''} ${highlighted ? 'highlighted' : ''}`}>
     <div className="weekday-name"><strong>{day}</strong><span className="date-label">{shortDate(date)}</span></div>
     <div className="span-editor">{rows.map((span, spanIndex) => {
       const label = `${day} Span ${spanIndex + 1}`;
       return <div className="span-controls" key={span.id}>
-        <input className="time-input" type="time" step="900" value={span.start} title={`${label} Start Time`} aria-label={`${label} Start Time`} onChange={(event) => onUpdate(date, span, 'start', event.target.value)} />
+        <TimeInput value={span.start} label={`${label} Start Time`} onCommit={(next) => onUpdate(date, span, 'start', next)} />
         <span className="range-dash">–</span>
-        <input className="time-input" type="time" step="900" value={span.end} title={`${label} End Time`} aria-label={`${label} End Time`} onChange={(event) => onUpdate(date, span, 'end', event.target.value)} />
+        <TimeInput value={span.end} label={`${label} End Time`} onCommit={(next) => onUpdate(date, span, 'end', next)} />
         <span className="entry-duration">{formatDuration(spanMinutes(span))}</span>
         <button className="span-action" title={`Delete ${label}`} aria-label={`Delete ${label}`} onClick={() => onRemove(date, span)}><Trash2 size={14} /></button>
       </div>;
